@@ -608,6 +608,8 @@
   const DAYS_RU = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
   const MONTHS_RU = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 
+  let bookedSlots = []; // Сюда прилетают занятые пары { date: "26.10.2026", time: "13:00" }
+
   let state = {
     service: 'Архитектура и окрашивание бровей',
     price: 1500,
@@ -616,6 +618,22 @@
     time: '',
     isToday: true
   };
+
+  // Загрузка занятых слотов из Google Таблицы
+  async function fetchBookedSlots() {
+    if (!GAS_WEB_APP_URL.includes('script.google.com')) return;
+    try {
+      const response = await fetch(GAS_WEB_APP_URL);
+      const data = await response.json();
+      if (data && Array.isArray(data.booked)) {
+        bookedSlots = data.booked;
+        renderTimeSlots();
+        updateSummary();
+      }
+    } catch (e) {
+      console.warn('Не удалось загрузить занятые слоты:', e);
+    }
+  }
 
   // Генерация 10 ближайших дней
   function initDates() {
@@ -630,7 +648,13 @@
       const dayName = i === 0 ? 'Сег' : (i === 1 ? 'Зав' : DAYS_RU[d.getDay()]);
       const dayNum = d.getDate();
       const monthName = MONTHS_RU[d.getMonth()];
-      const fullDate = d.toLocaleDateString('ru-RU'); // ДД.ММ.ГГГГ
+      
+      // Жёсткий формат ДД.ММ.ГГГГ (с ведущими нулями), чтобы не зависеть от настроек браузера
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yyyy = d.getFullYear();
+      const fullDate = `${dd}.${mm}.${yyyy}`;
+
       const label = i === 0 ? `Сегодня (${dayNum} ${monthName})` : `${dayNum} ${monthName}`;
 
       const chip = document.createElement('div');
@@ -660,7 +684,7 @@
     }
   }
 
-  // Отрисовка временных слотов (с учетом текущего часа)
+  // Отрисовка временных слотов (прошедшие + уже занятые в таблице)
   function renderTimeSlots() {
     const container = document.getElementById('timeContainer');
     container.innerHTML = '';
@@ -670,12 +694,14 @@
     TIME_SLOTS.forEach((slot) => {
       const slotHour = parseInt(slot.split(':')[0], 10);
       const isPast = state.isToday && slotHour <= currentHour;
+      const isBooked = bookedSlots.some(b => b.date === state.dateStr && b.time === slot);
+      const isDisabled = isPast || isBooked;
 
       const chip = document.createElement('div');
-      chip.className = `time-chip ${isPast ? 'disabled' : ''}`;
+      chip.className = `time-chip ${isDisabled ? 'disabled' : ''}`;
       chip.textContent = slot;
 
-      if (!isPast && !firstAvailable) {
+      if (!isDisabled && !firstAvailable) {
         firstAvailable = slot;
         chip.classList.add('active');
         state.time = slot;
@@ -716,7 +742,7 @@
   document.getElementById('bookingForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     if (state.time === 'Нет окон') {
-      alert('На выбранную дату свободных окон уже нет. Выберите, пожалуйста, завтрашний день.');
+      alert('На выбранную дату свободных окон уже нет. Выберите, пожалуйста, другой день.');
       return;
     }
 
@@ -737,7 +763,6 @@
     };
 
     try {
-      // Используем no-cors + text/plain чтобы избежать проблем с CORS preflight в браузере Instagram
       if (GAS_WEB_APP_URL.includes('script.google.com')) {
         await fetch(GAS_WEB_APP_URL, {
           method: 'POST',
@@ -746,9 +771,11 @@
           body: JSON.stringify(payload)
         });
       } else {
-        // Имитация задержки для демо-режима, если URL еще не вставлен
         await new Promise(r => setTimeout(r, 800));
       }
+
+      // Сразу добавляем слот в локальный список занятых, чтобы при нажатии "Записаться ещё раз" он уже был вычеркнут
+      bookedSlots.push({ date: state.dateStr, time: state.time });
 
       document.getElementById('bookingFlow').style.display = 'none';
       document.getElementById('successScreen').style.display = 'block';
@@ -770,12 +797,15 @@
     document.getElementById('bookingForm').reset();
     document.getElementById('successScreen').style.display = 'none';
     document.getElementById('bookingFlow').style.display = 'block';
+    renderTimeSlots();
+    updateSummary();
   }
 
   // Инициализация
   initDates();
   renderTimeSlots();
   updateSummary();
+  fetchBookedSlots(); // Подтягиваем занятые окна из таблицы
 </script>
 </body>
 </html>
