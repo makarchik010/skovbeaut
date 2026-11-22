@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>LUMIÈRE STUDIO — Онлайн-запись</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -23,11 +24,12 @@
 
     body {
       font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
-      background: #ECE8E2;
+      background: var(--bg);
       color: var(--text);
       display: flex;
       justify-content: center;
       line-height: 1.4;
+      overflow-x: hidden;
     }
 
     .wrap {
@@ -388,14 +390,31 @@
 
   <!-- ЭКРАН 3: Мини-футер -->
   <footer class="footer">
-    <div>📍 Центр, ул. Пушкинская, 268 • <a href="https://instagram.com" target="_blank">@lumiere.studio</a></div>
-    <a class="skov-tag" href="https://skovtech.ru" target="_blank">ENGINEERED BY SKOV TECHNOLOGIES</a>
+    <div>📍 Центр, ул. Пушкинская, 268 • <a href="https://instagram.com" target="_blank" rel="noopener">@lumiere.studio</a></div>
+    <a class="skov-tag" href="https://skovtech.ru" target="_top">ENGINEERED BY SKOV TECHNOLOGIES</a>
   </footer>
 </div>
 
 <script>
   // Вставьте сюда актуальный URL развёртывания Google Apps Script (/exec)
   const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/ВАШ_ID_СКРИПТА/exec';
+
+  // Инициализация Telegram WebApp (если открыто внутри Telegram)
+  (function initTelegramWebApp() {
+    try {
+      const tg = window.Telegram && window.Telegram.WebApp;
+      if (!tg) return;
+      tg.ready();
+      tg.expand();
+      const user = tg.initDataUnsafe && tg.initDataUnsafe.user;
+      if (user) {
+        const nameInput = document.getElementById('clientName');
+        const contactInput = document.getElementById('clientContact');
+        if (user.first_name && !nameInput.value) nameInput.value = user.first_name;
+        if (user.username && !contactInput.value) contactInput.value = '@' + user.username;
+      }
+    } catch (e) {}
+  })();
 
   const TIME_SLOTS = ['10:00', '11:30', '13:00', '14:30', '16:00', '17:30', '19:00', '20:30'];
   const DAYS_RU = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
